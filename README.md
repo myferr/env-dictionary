@@ -21,37 +21,13 @@ bun install
 
 ## Quick Start
 
-### Using Dictionary (Schema-based)
+### Using Dictionary (Create a typed env)
 
 ```typescript
-import { Dictionary } from './lib/dictionary';
-import { t } from './lib/t';
+import { Dictionary } from 'env-dictionary';
+import { t } from 'env-dictionary';
 
-const config = new Dictionary({
-  env: {
-    API_KEY: 'secret',
-    PORT: 3000,
-    DEBUG: true,
-  },
-  schema: {
-    API_KEY: t.string(),
-    PORT: t.number(),
-    DEBUG: t.boolean(),
-  },
-});
-
-console.log(config.values.API_KEY); // 'secret'
-console.log(config.values.PORT); // 3000
-console.log(config.values.DEBUG); // true
-```
-
-### Using DictionaryEnv (Descriptor-based)
-
-```typescript
-import { DictionaryEnv } from './lib/dictionary';
-import { t } from './lib/t';
-
-const env = new DictionaryEnv([
+const env = new Dictionary([
   { API_KEY: 'secret', type: t.string() },
   { PORT: 3000, type: t.number() },
   { DEBUG: true, type: t.boolean() },
@@ -60,6 +36,35 @@ const env = new DictionaryEnv([
 console.log(env.env.API_KEY); // 'secret'
 console.log(env.env.PORT); // 3000
 console.log(env.env.DEBUG); // true
+```
+
+### Using DictionaryEnv (Type pre-existing envs)
+
+```typescript
+import { DictionaryEnv } from 'env-dictionary';
+
+const typedEnv = new DictionaryEnv({ env: process.env })
+
+console.log(typedEnv.env.PORT) // 8080
+console.log(typedEnv.type.PORT) // Number
+```
+
+You can also provide a descriptor-based schema:
+
+```typescript
+import { DictionaryEnv } from 'env-dictionary';
+import { t } from 'env-dictionary';
+
+const typedEnv = new DictionaryEnv(
+  { env: process.env },
+  { schema: [
+    { var: 'PORT', type: t.number() },
+    { var: 'API_KEY', type: t.string() },
+  ]}
+)
+
+console.log(typedEnv.env.PORT) // 8080
+console.log(typedEnv.type.PORT) // Number
 ```
 
 ## API Reference
@@ -81,59 +86,12 @@ The `t` object provides type validators for schema definitions.
 
 ### Dictionary
 
-A class that validates environment variables against a schema.
-
-#### Constructor
-
-```typescript
-new Dictionary<T>(options: DictionaryOptions)
-```
-
-**Parameters:**
-
-- `options.env: Record<string, unknown>` - The environment variables to validate
-- `options.schema?: Record<string, SchemaType>` - Optional schema for validation
-
-**Properties:**
-
-- `values: T` - The validated and typed environment variables
-
-#### Example
-
-```typescript
-const dict = new Dictionary({
-  env: {
-    API_KEY: 'secret',
-    PORT: 3000,
-    DEBUG: true,
-    CONFIG: { url: 'https://api.example.com' },
-    ITEMS: [1, 2, 3],
-  },
-  schema: {
-    API_KEY: t.string(),
-    PORT: t.number(),
-    DEBUG: t.boolean(),
-    CONFIG: t.object(),
-    ITEMS: t.array(),
-  },
-});
-```
-
-#### Behavior
-
-- If no schema is provided, all environment variables are included as-is
-- If a schema is provided, only keys defined in the schema are included
-- Throws an error if a variable fails validation
-- Values are automatically typed based on the schema
-
-### DictionaryEnv
-
 A class that creates a typed environment object from an array of descriptors.
 
 #### Constructor
 
 ```typescript
-new DictionaryEnv<TSchema>(schema: TSchema)
+new Dictionary<TSchema>(schema: TSchema)
 ```
 
 **Parameters:**
@@ -147,7 +105,7 @@ new DictionaryEnv<TSchema>(schema: TSchema)
 #### Example
 
 ```typescript
-const env = new DictionaryEnv([
+const env = new Dictionary([
   { API_KEY: 'secret', type: t.string() },
   { PORT: 3000, type: t.number() },
   { DEBUG: true, type: t.boolean() },
@@ -170,17 +128,93 @@ Each descriptor must have:
 - Throws an error if a value fails validation for its type
 - Types are automatically inferred from the descriptors
 
+### DictionaryEnv
+
+A class that validates environment variables against a schema.
+
+#### Constructor
+
+```typescript
+new DictionaryEnv<T>(options: DictionaryOptions, descriptorOptions?: { schema: Array<{ var: string; type: SchemaType }> })
+```
+
+**Parameters:**
+
+- `options.env: Record<string, unknown>` - The environment variables to validate
+- `options.schema?: Record<string, SchemaType>` - Optional schema for validation (key-based)
+- `descriptorOptions?: { schema: Array<{ var: string; type: SchemaType }> }` - Optional descriptor-based schema
+
+**Properties:**
+
+- `env: T` - The validated and typed environment variables
+- `type: { [K in keyof T]: TypeConstructor }` - Type constructors for each variable
+
+#### Examples
+
+**Key-based schema:**
+
+```typescript
+const typedEnv = new DictionaryEnv({
+  env: {
+    API_KEY: 'secret',
+    PORT: 3000,
+    DEBUG: true,
+    CONFIG: { url: 'https://api.example.com' },
+    ITEMS: [1, 2, 3],
+  },
+  schema: {
+    API_KEY: t.string(),
+    PORT: t.number(),
+    DEBUG: t.boolean(),
+    CONFIG: t.object(),
+    ITEMS: t.array(),
+  },
+});
+```
+
+**Descriptor-based schema:**
+
+```typescript
+const typedEnv = new DictionaryEnv(
+  { env: process.env },
+  { schema: [
+    { var: 'PORT', type: t.number() },
+    { var: 'API_KEY', type: t.string() },
+  ]}
+);
+```
+
+#### Behavior
+
+- If no schema is provided, all environment variables are included as-is with inferred types
+- If a schema is provided (key-based or descriptor-based), only keys defined in the schema are included
+- Throws an error if a variable fails validation
+- Values are automatically typed based on the schema
+
 ## Usage Patterns
 
 ### Environment Variables
 
-Commonly used for validating `.env` files:
+Use `Dictionary` to create a new typed environment:
 
 ```typescript
-import { Dictionary } from './lib/dictionary';
-import { t } from './lib/t';
+import { Dictionary } from 'env-dictionary';
+import { t } from 'env-dictionary';
 
-const env = new Dictionary({
+const env = new Dictionary([
+  { DATABASE_URL: 'postgresql://localhost', type: t.string() },
+  { PORT: 5432, type: t.number() },
+  { NODE_ENV: 'development', type: t.string() },
+]);
+```
+
+Use `DictionaryEnv` to type a pre-existing environment (key-based schema):
+
+```typescript
+import { DictionaryEnv } from 'env-dictionary';
+import { t } from 'env-dictionary';
+
+const typedEnv = new DictionaryEnv({
   env: process.env,
   schema: {
     DATABASE_URL: t.string(),
@@ -188,6 +222,22 @@ const env = new Dictionary({
     NODE_ENV: t.string(),
   },
 });
+```
+
+Use `DictionaryEnv` with descriptor-based schema:
+
+```typescript
+import { DictionaryEnv } from 'env-dictionary';
+import { t } from 'env-dictionary';
+
+const typedEnv = new DictionaryEnv(
+  { env: process.env },
+  { schema: [
+    { var: 'DATABASE_URL', type: t.string() },
+    { var: 'PORT', type: t.number() },
+    { var: 'NODE_ENV', type: t.string() },
+  ]}
+);
 ```
 
 ### Configuration Object
@@ -206,7 +256,7 @@ const config = {
   },
 };
 
-const typedConfig = new Dictionary({
+const typedConfig = new DictionaryEnv({
   env: config,
   schema: {
     server: t.object(),
@@ -220,7 +270,7 @@ const typedConfig = new Dictionary({
 For complex nested objects, use the `object` type:
 
 ```typescript
-const dbConfig = new Dictionary({
+const dbConfig = new DictionaryEnv({
   env: {
     database: {
       host: 'localhost',
@@ -239,11 +289,23 @@ const dbConfig = new Dictionary({
 Both `Dictionary` and `DictionaryEnv` throw errors when validation fails:
 
 ```typescript
-import { Dictionary } from './lib/dictionary';
-import { t } from './lib/t';
+import { Dictionary } from 'env-dictionary';
+import { t } from 'env-dictionary';
 
 try {
-  const dict = new Dictionary({
+  const env = new Dictionary([
+    { PORT: '3000', type: t.number() }, // Should be a number
+  ]);
+} catch (error) {
+  console.error(error.message);
+  // 'ENV value "PORT" is not valid for the provided type'
+}
+
+import { DictionaryEnv } from 'env-dictionary';
+import { t } from 'env-dictionary';
+
+try {
+  const typedEnv = new DictionaryEnv({
     env: {
       PORT: '3000', // Should be a number
     },
@@ -255,17 +317,6 @@ try {
   console.error(error.message);
   // 'Invalid environment variable "PORT".'
 }
-
-import { DictionaryEnv } from './lib/dictionary';
-
-try {
-  const env = new DictionaryEnv([
-    { PORT: '3000', type: t.number() }, // Should be a number
-  ]);
-} catch (error) {
-  console.error(error.message);
-  // 'ENV value "PORT" is not valid for the provided type'
-}
 ```
 
 ## Type Safety
@@ -273,7 +324,10 @@ try {
 Both classes provide full TypeScript type inference:
 
 ```typescript
-const env = new DictionaryEnv([
+import { Dictionary } from 'env-dictionary';
+import { t } from 'env-dictionary';
+
+const env = new Dictionary([
   { API_KEY: 'secret', type: t.string() },
   { PORT: 3000, type: t.number() },
   { DEBUG: true, type: t.boolean() },
