@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { t } from "../lib/t";
+import { t } from "env-dictionary";
 
 describe("t validators", () => {
 	test("string validator", () => {
