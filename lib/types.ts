@@ -18,4 +18,4 @@ type DictionaryEnvDescriptor<T extends string, V> = { [K in T]: V } & {
 	type: SchemaType;
 };
 
-export type { SchemaType, DictionaryOptions, DictionaryEnvDescriptor }
+export type { SchemaType, DictionaryOptions, DictionaryEnvDescriptor };
