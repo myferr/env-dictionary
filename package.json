@@ -3,6 +3,10 @@
 	"version": "1.0.0",
 	"module": "dist/index.js",
 	"type": "module",
+	"scripts": {
+		"build": "bun build index.ts --outdir dist --target node",
+		"typecheck": "tsc --noEmit"
+	},
 	"devDependencies": {
 		"@types/bun": "latest"
 	},
