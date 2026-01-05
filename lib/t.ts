@@ -13,7 +13,14 @@ const stringSchema: Schema<string, "string"> = {
 
 const numberSchema: Schema<number, "number"> = {
 	type: "number",
-	validate: (input): input is number => typeof input === "number",
+	validate: (input): input is number => {
+		if (typeof input === "number") return true;
+		if (typeof input === "string") {
+			const parsed = Number(input);
+			return !isNaN(parsed) && isFinite(parsed) && input.trim() !== "";
+		}
+		return false;
+	},
 };
 
 const booleanSchema: Schema<boolean, "boolean"> = {
