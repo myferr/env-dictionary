@@ -1,102 +1,81 @@
 import { describe, expect, test } from "bun:test";
-import { t } from "../lib/t";
-import { Dictionary } from "../lib/dictionary";
+import { t } from "env-dictionary";
+import { Dictionary } from "env-dictionary";
 
 describe("Dictionary class", () => {
-	test("creates dictionary without schema", () => {
-		const dict = new Dictionary({
-			env: {
-				API_KEY: "secret",
-				PORT: "3000",
-			},
-		});
-		expect(dict.values.API_KEY).toBe("secret");
-		expect(dict.values.PORT).toBe("3000");
+	test("creates typed environment with valid values", () => {
+		const env = new Dictionary([
+			{ API_KEY: "secret", type: t.string() },
+			{ PORT: 3000, type: t.number() },
+			{ DEBUG: true, type: t.boolean() },
+		]);
+
+		expect(env.env.API_KEY).toBe("secret");
+		expect(env.env.PORT).toBe(3000);
+		expect(env.env.DEBUG).toBe(true);
 	});
 
-	test("creates dictionary with schema and valid values", () => {
-		const dict = new Dictionary({
-			env: {
-				API_KEY: "secret",
-				PORT: 3000,
-				DEBUG: true,
-			},
-			schema: {
-				API_KEY: t.string(),
-				PORT: t.number(),
-				DEBUG: t.boolean(),
-			},
-		});
-		expect(dict.values.API_KEY).toBe("secret");
-		expect(dict.values.PORT).toBe(3000);
-		expect(dict.values.DEBUG).toBe(true);
-	});
-
-	test("throws error for invalid environment variable", () => {
+	test("throws error for descriptor without variable name", () => {
 		expect(() => {
-			new Dictionary({
-				env: {
-					PORT: "3000",
-				},
-				schema: {
-					PORT: t.number(),
-				},
-			});
-		}).toThrow('Invalid environment variable "PORT".');
+			new Dictionary([{ type: t.string() }]);
+		}).toThrow("Descriptor must have a variable name");
 	});
 
-	test("only includes keys defined in schema", () => {
-		const dict = new Dictionary({
-			env: {
-				API_KEY: "secret",
-				PORT: 3000,
-				EXTRA: "ignored",
-			},
-			schema: {
-				API_KEY: t.string(),
-				PORT: t.number(),
-			},
-		});
-		expect(dict.values.API_KEY).toBe("secret");
-		expect(dict.values.PORT).toBe(3000);
-		expect("EXTRA" in dict.values).toBe(false);
+	test("throws error for descriptor without type", () => {
+		expect(() => {
+			new Dictionary([{ API_KEY: "secret" }] as any[]);
+		}).toThrow("Descriptor must have a type");
+	});
+
+	test("throws error for invalid ENV value", () => {
+		expect(() => {
+			new Dictionary([{ PORT: "3000", type: t.number() }]);
+		}).toThrow('ENV value "PORT" is not valid for the provided type');
 	});
 
 	test("works with object type", () => {
 		const config = { url: "https://api.example.com" };
-		const dict = new Dictionary({
-			env: {
-				CONFIG: config,
-			},
-			schema: {
-				CONFIG: t.object(),
-			},
-		});
-		expect(dict.values.CONFIG).toBe(config);
+		const env = new Dictionary([{ CONFIG: config, type: t.object() }]);
+
+		expect(env.env.CONFIG).toBe(config);
 	});
 
 	test("works with array type", () => {
 		const list = [1, 2, 3];
-		const dict = new Dictionary({
-			env: {
-				ITEMS: list,
-			},
-			schema: {
-				ITEMS: t.array(),
-			},
-		});
-		expect(dict.values.ITEMS).toBe(list);
+		const env = new Dictionary([{ ITEMS: list, type: t.array() }]);
+
+		expect(env.env.ITEMS).toBe(list);
 	});
 
 	test("works with any type", () => {
-		const dict = new Dictionary({
-			env: {
-				MIXED: "anything",
-			},
-			schema: {
-				MIXED: t.any(),
-			},
-		});
-		expect(dict.values.MIXED).toBe("anything");
+		const env = new Dictionary([{ MIXED: "anything", type: t.any() }]);
+
+		expect(env.env.MIXED).toBe("anything");
+	});
+
+	test("handles multiple descriptors correctly", () => {
+		const env = new Dictionary([
+			{ HOST: "localhost", type: t.string() },
+			{ PORT: 8080, type: t.number() },
+			{ ENABLED: false, type: t.boolean() },
+			{ OPTIONS: { a: 1 }, type: t.object() },
+			{ TAGS: ["tag1", "tag2"], type: t.array() },
+		]);
+
+		expect(env.env.HOST).toBe("localhost");
+		expect(env.env.PORT).toBe(8080);
+		expect(env.env.ENABLED).toBe(false);
+		expect(env.env.OPTIONS).toEqual({ a: 1 });
+		expect(env.env.TAGS).toEqual(["tag1", "tag2"]);
+	});
+
+	test("type inference works correctly", () => {
+		const env = new Dictionary([
+			{ NAME: "test", type: t.string() },
+			{ COUNT: 42, type: t.number() },
+		]);
+
+		expect(env.env.NAME).toBe("test");
+		expect(env.env.COUNT).toBe(42);
 	});
 });
