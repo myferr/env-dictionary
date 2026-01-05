@@ -1,81 +1,160 @@
 import { describe, expect, test } from "bun:test";
-import { t } from "../lib/t";
-import { DictionaryEnv } from "../lib/dictionary";
+import { t } from "env-dictionary";
+import { DictionaryEnv } from "env-dictionary";
 
 describe("DictionaryEnv class", () => {
-	test("creates typed environment with valid values", () => {
-		const env = new DictionaryEnv([
-			{ API_KEY: "secret", type: t.string() },
-			{ PORT: 3000, type: t.number() },
-			{ DEBUG: true, type: t.boolean() },
-		]);
-
-		expect(env.env.API_KEY).toBe("secret");
-		expect(env.env.PORT).toBe(3000);
-		expect(env.env.DEBUG).toBe(true);
+	test("creates dictionary without schema", () => {
+		const dict = new DictionaryEnv({
+			env: {
+				API_KEY: "secret",
+				PORT: "3000",
+			},
+		});
+		expect(dict.env.API_KEY).toBe("secret");
+		expect(dict.env.PORT).toBe("3000");
 	});
 
-	test("throws error for descriptor without variable name", () => {
-		expect(() => {
-			new DictionaryEnv([{ type: t.string() }]);
-		}).toThrow("Descriptor must have a variable name");
+	test("creates dictionary with schema and valid values", () => {
+		const dict = new DictionaryEnv({
+			env: {
+				API_KEY: "secret",
+				PORT: 3000,
+				DEBUG: true,
+			},
+			schema: {
+				API_KEY: t.string(),
+				PORT: t.number(),
+				DEBUG: t.boolean(),
+			},
+		});
+		expect(dict.env.API_KEY).toBe("secret");
+		expect(dict.env.PORT).toBe(3000);
+		expect(dict.env.DEBUG).toBe(true);
 	});
 
-	test("throws error for descriptor without type", () => {
+	test("throws error for invalid environment variable", () => {
 		expect(() => {
-			new DictionaryEnv([{ API_KEY: "secret" }] as any[]);
-		}).toThrow("Descriptor must have a type");
+			new DictionaryEnv({
+				env: {
+					PORT: "3000",
+				},
+				schema: {
+					PORT: t.number(),
+				},
+			});
+		}).toThrow('Invalid environment variable "PORT".');
 	});
 
-	test("throws error for invalid ENV value", () => {
-		expect(() => {
-			new DictionaryEnv([{ PORT: "3000", type: t.number() }]);
-		}).toThrow('ENV value "PORT" is not valid for the provided type');
+	test("only includes keys defined in schema", () => {
+		const dict = new DictionaryEnv({
+			env: {
+				API_KEY: "secret",
+				PORT: 3000,
+				EXTRA: "ignored",
+			},
+			schema: {
+				API_KEY: t.string(),
+				PORT: t.number(),
+			},
+		});
+		expect(dict.env.API_KEY).toBe("secret");
+		expect(dict.env.PORT).toBe(3000);
+		expect("EXTRA" in dict.env).toBe(false);
 	});
 
 	test("works with object type", () => {
 		const config = { url: "https://api.example.com" };
-		const env = new DictionaryEnv([{ CONFIG: config, type: t.object() }]);
-
-		expect(env.env.CONFIG).toBe(config);
+		const dict = new DictionaryEnv({
+			env: {
+				CONFIG: config,
+			},
+			schema: {
+				CONFIG: t.object(),
+			},
+		});
+		expect(dict.env.CONFIG).toBe(config);
 	});
 
 	test("works with array type", () => {
 		const list = [1, 2, 3];
-		const env = new DictionaryEnv([{ ITEMS: list, type: t.array() }]);
-
-		expect(env.env.ITEMS).toBe(list);
+		const dict = new DictionaryEnv({
+			env: {
+				ITEMS: list,
+			},
+			schema: {
+				ITEMS: t.array(),
+			},
+		});
+		expect(dict.env.ITEMS).toBe(list);
 	});
 
 	test("works with any type", () => {
-		const env = new DictionaryEnv([{ MIXED: "anything", type: t.any() }]);
-
-		expect(env.env.MIXED).toBe("anything");
+		const dict = new DictionaryEnv({
+			env: {
+				MIXED: "anything",
+			},
+			schema: {
+				MIXED: t.any(),
+			},
+		});
+		expect(dict.env.MIXED).toBe("anything");
 	});
 
-	test("handles multiple descriptors correctly", () => {
-		const env = new DictionaryEnv([
-			{ HOST: "localhost", type: t.string() },
-			{ PORT: 8080, type: t.number() },
-			{ ENABLED: false, type: t.boolean() },
-			{ OPTIONS: { a: 1 }, type: t.object() },
-			{ TAGS: ["tag1", "tag2"], type: t.array() },
-		]);
-
-		expect(env.env.HOST).toBe("localhost");
-		expect(env.env.PORT).toBe(8080);
-		expect(env.env.ENABLED).toBe(false);
-		expect(env.env.OPTIONS).toEqual({ a: 1 });
-		expect(env.env.TAGS).toEqual(["tag1", "tag2"]);
+	test("provides type property", () => {
+		const dict = new DictionaryEnv({
+			env: {
+				API_KEY: "secret",
+				PORT: 3000,
+				DEBUG: true,
+			},
+			schema: {
+				API_KEY: t.string(),
+				PORT: t.number(),
+				DEBUG: t.boolean(),
+			},
+		});
+		expect(dict.type.API_KEY).toBe(String);
+		expect(dict.type.PORT).toBe(Number);
+		expect(dict.type.DEBUG).toBe(Boolean);
 	});
 
-	test("type inference works correctly", () => {
-		const env = new DictionaryEnv([
-			{ NAME: "test", type: t.string() },
-			{ COUNT: 42, type: t.number() },
-		]);
+	test("accepts descriptor-based schema", () => {
+		const dict = new DictionaryEnv(
+			{
+				env: {
+					API_KEY: "secret",
+					PORT: 3000,
+					DEBUG: true,
+				},
+			},
+			{
+				schema: [
+					{ var: "API_KEY", type: t.string() },
+					{ var: "PORT", type: t.number() },
+					{ var: "DEBUG", type: t.boolean() },
+				],
+			},
+		);
+		expect(dict.env.API_KEY).toBe("secret");
+		expect(dict.env.PORT).toBe(3000);
+		expect(dict.env.DEBUG).toBe(true);
+		expect(dict.type.API_KEY).toBe(String);
+		expect(dict.type.PORT).toBe(Number);
+		expect(dict.type.DEBUG).toBe(Boolean);
+	});
 
-		expect(env.env.NAME).toBe("test");
-		expect(env.env.COUNT).toBe(42);
+	test("throws error with descriptor-based schema for invalid value", () => {
+		expect(() => {
+			new DictionaryEnv(
+				{
+					env: {
+						PORT: "3000",
+					},
+				},
+				{
+					schema: [{ var: "PORT", type: t.number() }],
+				},
+			);
+		}).toThrow('Invalid environment variable "PORT".');
 	});
 });
