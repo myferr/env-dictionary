@@ -1,5 +1,5 @@
 {
-	"name": "dictionary",
+	"name": "env-dictionary",
 	"version": "1.0.0",
 	"module": "dist/index.js",
 	"type": "module",

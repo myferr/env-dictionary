@@ -1,4 +1,4 @@
-# Dictionary
+# env-dictionary
 
 A TypeScript library for type-safe environment variable handling with runtime validation.
 
