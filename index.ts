@@ -1,1 +1,1 @@
-export { t } from "./lib/t" 
+export { t } from "./lib/t";
